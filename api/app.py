@@ -10,7 +10,7 @@ import requests
 import datetime
 import pydantic
 import motor.motor_asyncio
-
+import pytz
 
 app = FastAPI()
 
@@ -53,6 +53,13 @@ sunset_api_data = sunset_api_response.json()
 
 current_date = datetime.date.today()
 sunset_time = datetime.datetime.strptime(sunset_api_data['results']['sunset'], '%I:%M:%S %p').time()
+now_time = datetime.datetime.now(pytz.timezone('Jamaica')).time()
+
+
+datetime1 = datetime.datetime.strptime(str(sunset_time),"%H:%M:%S")
+datetime2 = datetime.datetime.strptime(str(now_time),"%H:%M:%S.%f")
+
+
 
 # Check if the user has chosen the sunset option for turning on the lights
 user_set_sunset_option = True  # Assume the user has chosen the sunset option for this example
@@ -88,8 +95,8 @@ async def home():
     return {"message": "ECSE3038 - Project"}
 
 @app.get('/graph?size={n}')
-async def get_sensor_readings(request: Request,n : n):
-    readings = sensor_readings.find().sort('timestamp', -1).limit(n)
+async def get_sensor_readings(request: Request, n):
+    readings = sensor_readings.find().limit(n)
     result = []
     for reading in readings:
         result.append({
@@ -100,10 +107,31 @@ async def get_sensor_readings(request: Request,n : n):
         })
     return result
 
+
 @app.put('/settings')
 async def get_sensor_readings(request: Request, limit: int = 10):
-    return
+    state = await request.json()
+    #final_sunset_time = str(get_sunset())
+    state["light"] = (datetime1<datetime2)
+    state["fan"] = (float(state["temperature"]) >= 28.0) 
 
-@app.get()
-async def get_sensor_readings(request: Request, limit: int = 10):
-    return
+    obj = await sensor_readings.find_one({"tobe":"updated"})
+
+    if obj:
+        await sensor_readings.update_one({"tobe":"updated"}, {"$set": state})
+    else:
+        await sensor_readings.insert_one({**state, "tobe": "updated"})
+    new_obj = await sensor_readings.find_one({"tobe":"updated"}) 
+    return new_obj,204
+
+
+@app.get("/api/state")
+async def get_state():
+  state = await sensor_readings.find_one({"tobe": "updated"})
+  
+  state["fan"] = (float(state["temperature"]) >= 28.0) 
+  state["light"] = (datetime1<datetime2)
+
+  if state == None:
+    return {"fan": False, "light": False}
+  return state

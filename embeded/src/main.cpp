@@ -2,14 +2,31 @@
 #include <Wifi.h>
 #include <HTTPClient.h>
 #include <ArduinoJson.h>
-#include "env.h"
+#include "env.h" 
 
-char * endpoint = "https://swapi.dev/api/people/1";
+#define endpoint "rg-lab6-api.onrender.com"
+
+#define fanPin 22
+#define lightPin 23
+#define presencePin 24
+
+
+float getTemp(){
+
+  return random(21.1,33.1);
+}
 
 void setup() {
-  Serial.begin(115200);
-  WiFi.begin(WIFI_SSID, WIFI_PASS);
 
+  Serial.begin(9600);
+
+	pinMode(fanPin,OUTPUT);
+  pinMode(lightPin,OUTPUT);
+
+	// WiFi_SSID and WIFI_PASS should be stored in the env.h
+  WiFi.begin(WIFI_SSID, WIFI_PASS);
+  Serial.println("");
+	// Connect to wifi
   Serial.println("Connecting");
   while(WiFi.status() != WL_CONNECTED) {
     delay(500);
@@ -21,16 +38,61 @@ void setup() {
 }
 
 void loop() {
-  // put your main code here, to run repeatedly:
+  //Check WiFi connection status
   if(WiFi.status()== WL_CONNECTED){
+    Serial.println("");
+    Serial.println("");
     HTTPClient http;
-    
+  
+    // Establish a connection to the server
+    String url = "https://" + String(endpoint) + "/api/temperature";
+    http.begin(url);
+    http.addHeader("Content-type", "application/json");
+
+
+
+    // Specify content-type header
+    //http.addHeader("Content-Type", "application/json");
+
+    StaticJsonDocument<1024> docput;
+    String httpRequestData;
+
+    // Serialise JSON object into a string to be sent to the API
+  
+
+    docput["temperature"] = getTemp();
+
+
+    // convert JSON document, doc, to string and copies it into httpRequestData
+    serializeJson(docput, httpRequestData);
+
+    // Send HTTP PUT request
+    int httpResponseCode = http.PUT(httpRequestData);
     String http_response;
 
+    // check reuslt of PUT request. negative response code means server wasn't reached
+    if (httpResponseCode>0) {
+      Serial.print("HTTP Response code: ");
+      Serial.println(httpResponseCode);
 
-    http.begin(endpoint);
+      Serial.print("HTTP Response from server: ");
+      http_response = http.getString();
+      Serial.println(http_response);
+    }
+    else {
+      Serial.print("Error code: ");
+      Serial.println(httpResponseCode);
+    }
 
-    int httpResponseCode = http.GET();
+    http.end();
+
+
+    url = "https://" + String(endpoint) + "/api/state";    
+    http.begin(url);
+    httpResponseCode = http.GET();
+
+    Serial.println("");
+    Serial.println("");
 
     if (httpResponseCode>0) {
         Serial.print("HTTP Response code: ");
@@ -43,30 +105,34 @@ void loop() {
       else {
         Serial.print("Error code: ");
         Serial.println(httpResponseCode);
-      }
-      // Free resources
-      http.end();
+    }
+ 
+    StaticJsonDocument<1024> docget;
 
-      StaticJsonDocument<1024> doc;
+    DeserializationError error = deserializeJson(docget, http_response);
 
-      DeserializationError error = deserializeJson(doc, http_response);
+    if (error) {
+      Serial.print("deserializeJson() failed: ");
+      Serial.println(error.c_str());
+      return;
+    }
+    
+    bool temp = docget["fan"]; 
+    bool light= docget["light"]; 
 
-      if (error) {
-        Serial.print("deserializeJson() failed: ");
-        Serial.println(error.c_str());
-        return;
-      }
-
-      const char* name = doc["name"]; // "Luke Skywalker"
-      const char* height = doc["height"]; // "172"
-      const char* mass = doc["mass"]; // "77"
-
-      Serial.println("");
-      Serial.println(name);
-      Serial.println(height);
-      Serial.println(mass);
+    digitalWrite(fanPin,temp);
+    digitalWrite(lightPin,temp);
+    
+    // Free resources
+    http.end();
   }
   else {
-    return;
+    Serial.println("WiFi Disconnected");
   }
 }
+
+
+
+
+
+
