@@ -16,7 +16,9 @@ app = FastAPI()
 
 
 origins = [
-    "https://ecse3038-lab3-tester.netlify.app"
+    "https://simple-smart-hub-client.netlify.app/",
+    "http://127.0.0.1:8000"
+
 ]
 
 app.add_middleware(
@@ -95,34 +97,38 @@ async def home():
     return {"message": "ECSE3038 - Project"}
 
 @app.get('/graph?size={n}')
-async def get_sensor_readings(request: Request, n):
-    readings = sensor_readings.find().limit(n)
+async def get_sensor_readings(request: Request, n: int):
+    readings = await sensor_readings.find().to_list(n)
     result = []
     for reading in readings:
         result.append({
             'id': str(reading['_id']),
-            'temperature': reading['temperature'],
+            'temperature': reading['user_temp'],
             'presence': reading['presence'],
             'timestamp': reading['timestamp'].isoformat(),
         })
-    return result
+    return readings
 
 
 @app.put('/settings')
-async def get_sensor_readings(request: Request, limit: int = 10):
+async def get_sensor_readings(request: Request):
     state = await request.json()
     #final_sunset_time = str(get_sunset())
-    state["light"] = (datetime1<datetime2)
-    state["fan"] = (float(state["temperature"]) >= 28.0) 
+    user_temp = state["user_temp"]
+    user_light = state["user_light"]
+    light_time_off = state["light_duration"]
 
-    obj = await sensor_readings.find_one({"tobe":"updated"})
+    user_light_scr = datetime.datetime.strptime(user_light, "%H:%M:%S")
+    new_user_light = user_light_scr + parse_time(light_time_off)
 
-    if obj:
-        await sensor_readings.update_one({"tobe":"updated"}, {"$set": state})
-    else:
-        await sensor_readings.insert_one({**state, "tobe": "updated"})
-    new_obj = await sensor_readings.find_one({"tobe":"updated"}) 
-    return new_obj,204
+    output = {
+        "user_temp": user_temp,
+        "user_light": user_light,
+        "light_time_off": str(new_user_light.time())
+        }
+    new_settings = await sensor_readings.insert_one(output)
+    created_settings = await sensor_readings.find_one({"_id":new_settings.inserted_id})
+    return created_settings
 
 
 @app.get("/api/state")
