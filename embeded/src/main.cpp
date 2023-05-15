@@ -16,6 +16,11 @@ float getTemp(){
   return random(21.1,33.1);
 }
 
+float getpresence(){
+
+  return random(0,1);
+}
+
 void setup() {
 
   Serial.begin(9600);
@@ -45,7 +50,7 @@ void loop() {
     HTTPClient http;
   
     // Establish a connection to the server
-    String url = "https://" + String(endpoint) + "/api/temperature";
+    String url = "https://" + String(endpoint) + "/temperature";
     http.begin(url);
     http.addHeader("Content-type", "application/json");
 
@@ -61,7 +66,8 @@ void loop() {
   
 
     docput["temperature"] = getTemp();
-
+    docput["presence"] = getpresence();
+  
 
     // convert JSON document, doc, to string and copies it into httpRequestData
     serializeJson(docput, httpRequestData);
@@ -87,7 +93,7 @@ void loop() {
     http.end();
 
 
-    url = "https://" + String(endpoint) + "/api/state";    
+    url = "https://" + String(endpoint) + "/state";    
     http.begin(url);
     httpResponseCode = http.GET();
 
@@ -119,9 +125,11 @@ void loop() {
     
     bool temp = docget["fan"]; 
     bool light= docget["light"]; 
+    bool presence= docget["presenbce"]; 
 
     digitalWrite(fanPin,temp);
-    digitalWrite(lightPin,temp);
+    digitalWrite(lightPin,light);
+    digitalWrite(presencePin,presence);
     
     // Free resources
     http.end();
