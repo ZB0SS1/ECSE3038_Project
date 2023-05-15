@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
 from pymongo import MongoClient
 from datetime import datetime, timedelta
 from geopy.geocoders import Nominatim
@@ -23,7 +23,7 @@ origins = [
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -35,6 +35,7 @@ pydantic.json.ENCODERS_BY_TYPE[ObjectId] = str
 client = motor.motor_asyncio.AsyncIOMotorClient("mongodb+srv://IOT_CLASS:iotclass@cluster0.irzkjxq.mongodb.net/?retryWrites=true&w=majority")
 db = client.iot_platform
 sensor_readings = db['sensor_readings']
+data = db['data']
 
 
 
@@ -134,3 +135,37 @@ async def get_sensor_readings(request: Request):
     new_settings = await sensor_readings.insert_one(output)
     created_settings = await sensor_readings.find_one({"_id":new_settings.inserted_id})
     return created_settings
+
+
+
+
+@app.put("/temperature")
+async def toggle(request: Request): 
+  state = await request.json()
+#   state["light"] = (datetime1<datetime2)
+#   state["fan"] = (float(state["temperature"]) >= 28.0)
+#   state["pir"] = (state["presence"]==1)
+
+  state["light"] = ((datetime2 < get_sunset()+ parse_time("8h")) & (state["presence"] == "1" ))
+  state["fan"] = ((float(state["temperature"]) >= 28.0) & (state["presence"]=="1"))
+
+  obj = await data.find_one({"tobe":"updated"})
+  if obj:
+    await data.update_one({"tobe":"updated"}, {"$set": state})
+  else:
+    await data.insert_one({**state, "tobe": "updated"})
+  new_obj = await data.find_one({"tobe":"updated"}) 
+  return new_obj,204
+
+
+
+@app.get("/state")
+async def get_state():
+  state = await data.find_one({"tobe": "updated"})
+  
+  state["fan"] = (float(state["temperature"]) >= 28.0) 
+  state["light"] = (get_sunset()<datetime2)
+
+  if state == None:
+    return {"fan": False, "light": False}
+  return state
