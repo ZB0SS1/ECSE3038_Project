@@ -1,17 +1,14 @@
-from fastapi import FastAPI, HTTPException, Request
-from pymongo import MongoClient
+from fastapi import FastAPI, Request
 from datetime import datetime, timedelta
 from geopy.geocoders import Nominatim
 from fastapi.middleware.cors import CORSMiddleware
 from bson import ObjectId
-from motor.motor_asyncio import AsyncIOMotorClient
 import re
 import requests
 import datetime
 import pydantic
 import motor.motor_asyncio
 import pytz
-import random
 
 app = FastAPI()
 
@@ -62,18 +59,7 @@ current_date = datetime.date.today()
 now_time = datetime.datetime.now(pytz.timezone('Jamaica')).time()
 datetime2 = datetime.datetime.strptime(str(now_time),"%H:%M:%S.%f")
 
-
-
-# Check if the user has chosen the sunset option for turning on the lights
-user_set_sunset_option = True  # Assume the user has chosen the sunset option for this example
-
-if user_set_sunset_option:
-    # Compare the current time to the sunset time and turn on the lights if the current time is later than the sunset time
-    current_time = datetime.datetime.now().time()
-
-        # Turn on the lights
-        # Code for turning on the lights goes here
-
+temperature = 28
 
 
 
@@ -102,15 +88,21 @@ async def home():
 @app.get('/graph')
 async def graph(request: Request):
     size = int(request.query_params.get('size'))
-    readings = await sensor_readings.find().to_list(size)
-    data = []
+    readings = await data.find().to_list(size)
+    data_reading = []
     for reading in readings:
-        data.append({
-            "temperature": reading["user_temp"],
-            "presence": random.choice([True, False]),
-            "datetime":reading["user_light"]
-        })
-    return data
+        temperature = reading.get("temperature")
+        presence = reading.get("presence")
+        current_time = reading.get("current_time")
+
+        if temperature and presence and current_time:
+            data_reading.append({
+                "temperature": temperature,
+                "presence": presence,
+                "datetime": current_time
+            })
+
+    return data_reading
 
 @app.put('/settings')
 async def get_sensor_readings(request: Request):
@@ -119,6 +111,8 @@ async def get_sensor_readings(request: Request):
     user_temp = state["user_temp"]
     user_light = state["user_light"]
     light_time_off = state["light_duration"]
+    global temperature 
+    temperature = int(user_temp)
 
     if user_light == "sunset":
         user_light_scr = get_sunset()
@@ -141,31 +135,28 @@ async def get_sensor_readings(request: Request):
 
 @app.put("/temperature")
 async def toggle(request: Request): 
-  state = await request.json()
-#   state["light"] = (datetime1<datetime2)
-#   state["fan"] = (float(state["temperature"]) >= 28.0)
-#   state["pir"] = (state["presence"]==1)
+    state = await request.json()
+    global temperature
+    state["light"] = ((datetime2 < get_sunset()+ parse_time("8h")) & (state["presence"] == "1" ))
+    state["fan"] = ((float(state["temperature"]) >= temperature) & (state["presence"]=="1"))
+    state["current_time"]= datetime.datetime.now()
 
-  state["light"] = ((datetime2 < get_sunset()+ parse_time("8h")) & (state["presence"] == "1" ))
-  state["fan"] = ((float(state["temperature"]) >= 28.0) & (state["presence"]=="1"))
-
-  obj = await data.find_one({"tobe":"updated"})
-  if obj:
-    await data.update_one({"tobe":"updated"}, {"$set": state})
-  else:
-    await data.insert_one({**state, "tobe": "updated"})
-  new_obj = await data.find_one({"tobe":"updated"}) 
-  return new_obj,204
+    new_settings = await data.insert_one(state)
+    new_obj = await data.find_one({"_id":new_settings.inserted_id}) 
+    return new_obj
 
 
-
+#retreves last entry
 @app.get("/state")
 async def get_state():
-  state = await data.find_one({"tobe": "updated"})
-  
-  state["fan"] = (float(state["temperature"]) >= 28.0) 
-  state["light"] = (get_sunset()<datetime2)
+    last_entry = await data.find().sort('_id', -1).limit(1).to_list(1)
 
-  if state == None:
-    return {"fan": False, "light": False}
-  return state
+    if not last_entry:
+        return {
+            "presence": False,
+            "fan": False,
+            "light": False,
+            "current_time": datetime.datetime.now()
+        }
+
+    return last_entry
