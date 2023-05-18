@@ -1,14 +1,16 @@
-from fastapi import FastAPI, Request
-from datetime import datetime, timedelta
-from geopy.geocoders import Nominatim
-from fastapi.middleware.cors import CORSMiddleware
-from bson import ObjectId
 import re
 import requests
 import datetime
 import pydantic
 import motor.motor_asyncio
 import pytz
+from bson import ObjectId
+from fastapi import FastAPI, Request
+from datetime import datetime, timedelta
+from geopy.geocoders import Nominatim
+from fastapi.middleware.cors import CORSMiddleware
+
+
 
 app = FastAPI()
 
@@ -30,8 +32,8 @@ app.add_middleware(
 pydantic.json.ENCODERS_BY_TYPE[ObjectId] = str
 
 client = motor.motor_asyncio.AsyncIOMotorClient("mongodb+srv://IOT_CLASS:iotclass@cluster0.irzkjxq.mongodb.net/?retryWrites=true&w=majority")
-db = client.iot_platform
-sensor_readings = db['sensor_readings']
+db = client.ECSE3038_Project
+settings = db['settings']
 data = db['data']
 
 
@@ -64,16 +66,16 @@ def get_sunset():
     sunset_api_response = requests.get(sunset_api_endpoint)
     sunset_api_data = sunset_api_response.json()
 
-    sunset_time = datetime.datetime.strptime(sunset_api_data['results']['sunset'], '%I:%M:%S %p').time()
+    sunset_time = datetime.strptime(sunset_api_data['results']['sunset'], '%I:%M:%S %p').time()
     
     utc_to_ja = parse_time("5h")
 
-    return datetime.datetime.strptime(str(sunset_time),"%H:%M:%S") - utc_to_ja 
+    return datetime.strptime(str(sunset_time),"%H:%M:%S") - utc_to_ja 
 
 def get_current_time():
     jamaica_ptz = pytz.timezone('Jamaica')
-    now_time = datetime.datetime.now(jamaica_ptz).time()
-    return datetime.datetime.strptime(str(now_time),"%H:%M:%S.%f")
+    now_time = datetime.now(jamaica_ptz).time()
+    return datetime.strptime(str(now_time),"%H:%M:%S.%f")
 
 
 
@@ -86,7 +88,7 @@ async def home():
 @app.get('/graph')
 async def graph(request: Request):
     size = int(request.query_params.get('size'))
-    readings = await data.find().to_list(size)
+    readings = await data.find().sort('_id', -1).to_list(size)
 
     data_reading = []
     
@@ -118,7 +120,7 @@ async def put_parameters(request: Request):
     if user_light == "sunset":
         user_light_scr = get_sunset()
     else:
-        user_light_scr = datetime.datetime.strptime(user_light, "%H:%M:%S")
+        user_light_scr = datetime.strptime(user_light, "%H:%M:%S")
 
     new_user_light = user_light_scr + parse_time(light_time_off)
 
@@ -128,14 +130,14 @@ async def put_parameters(request: Request):
         "light_time_off": str(new_user_light.time())
     }
 
-    obj = await sensor_readings.find().sort('_id', -1).limit(1).to_list(1)
+    obj = await settings.find().sort('_id', -1).limit(1).to_list(1)
 
     if obj:
-        await sensor_readings.update_one({"_id": obj[0]["_id"]}, {"$set": output})
-        new_obj = await sensor_readings.find_one({"_id": obj[0]["_id"]})
+        await settings.update_one({"_id": obj[0]["_id"]}, {"$set": output})
+        new_obj = await settings.find_one({"_id": obj[0]["_id"]})
     else:
-        new = await sensor_readings.insert_one(output)
-        new_obj = await sensor_readings.find_one({"_id": new.inserted_id})
+        new = await settings.insert_one(output)
+        new_obj = await settings.find_one({"_id": new.inserted_id})
 
     return new_obj
 
@@ -145,19 +147,19 @@ async def put_parameters(request: Request):
 async def toggle(request: Request):
     state = await request.json()
 
-    param = await sensor_readings.find().sort('_id', -1).limit(1).to_list(1)
+    param = await settings.find().sort('_id', -1).limit(1).to_list(1)
     
     temperature = param[0]["user_temp"]
 
     current_time = get_current_time()  # Call the function to get the current time
-    user_light = datetime.datetime.strptime(param[0]["user_light"], "%H:%M:%S")
-    light_time_off = datetime.datetime.strptime(param[0]["light_time_off"], "%H:%M:%S")
+    user_light = datetime.strptime(param[0]["user_light"], "%H:%M:%S")
+    light_time_off = datetime.strptime(param[0]["light_time_off"], "%H:%M:%S")
 
     state["light"] = (
         (user_light < current_time < light_time_off and state["presence"] == "1")
     )
     state["fan"] = (float(state["temperature"]) >= temperature and state["presence"] == "1")
-    state["current_time"] = datetime.datetime.now()
+    state["current_time"] = datetime.now()
 
     new_settings = await data.insert_one(state)
     new_obj = await data.find_one({"_id": new_settings.inserted_id})
@@ -175,7 +177,7 @@ async def get_state():
             "presence": False,
             "fan": False,
             "light": False,
-            "current_time": datetime.datetime.now()
+            "current_time": datetime.now()
         }
 
     return last_entry
