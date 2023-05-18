@@ -35,7 +35,7 @@ pydantic.json.ENCODERS_BY_TYPE[ObjectId] = str
 client = motor.motor_asyncio.AsyncIOMotorClient("mongodb+srv://IOT_CLASS:iotclass@cluster0.irzkjxq.mongodb.net/?retryWrites=true&w=majority")
 db = client.ECSE3038_Project
 settings = db['settings']
-data = db['data']
+updates = db['data']
 
 
 
@@ -89,7 +89,7 @@ async def home():
 @app.get('/graph')
 async def graph(request: Request):
     size = int(request.query_params.get('size'))
-    readings = await data.find().sort('_id', -1).limit(size).to_list(size)
+    readings = await updates.find().sort('_id', -1).limit(size).to_list(size)
 
     data_reading = []
     
@@ -114,13 +114,13 @@ async def graph(request: Request):
 async def put_parameters(request: Request):
     state = await request.json()
     user_temp = state["user_temp"]
-    user_light = state["user_light"]
+    light_time_on = state["user_light"]
     light_time_off = state["light_duration"]
 
-    if user_light == "sunset":
+    if light_time_on == "sunset":
         user_light_scr = get_sunset()
     else:
-        user_light_scr = datetime.strptime(user_light, "%H:%M:%S")
+        user_light_scr = datetime.strptime(light_time_on, "%H:%M:%S")
 
     new_user_light = user_light_scr + parse_time(light_time_off)
 
@@ -161,8 +161,8 @@ async def toggle(request: Request):
     state["fan"] = (float(state["temperature"]) >= temperature and state["presence"] == "1")
     state["current_time"] = datetime.now()
 
-    new_settings = await data.insert_one(state)
-    new_obj = await data.find_one({"_id": new_settings.inserted_id})
+    new_settings = await updates.insert_one(state)
+    new_obj = await updates.find_one({"_id": new_settings.inserted_id})
     return new_obj
 
 
@@ -170,7 +170,7 @@ async def toggle(request: Request):
 #retreves last entry
 @app.get("/state")
 async def get_state():
-    last_entry = await data.find().sort('_id', -1).limit(1).to_list(1)
+    last_entry = await updates.find().sort('_id', -1).limit(1).to_list(1)
 
     if not last_entry:
         return {
