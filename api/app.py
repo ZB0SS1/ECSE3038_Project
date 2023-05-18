@@ -29,7 +29,7 @@ app.add_middleware(
 
 pydantic.json.ENCODERS_BY_TYPE[ObjectId] = str
 
-client = motor.motor_asyncio.AsyncIOMotorClient("mongodb+srv://IOT_CLASS:iotclass@cluster0.irzkjxq.mongodb.net/?retryWrites=true&w=majority")
+client = motor.motor_asyncio.AsyncIOMotorClient("MotorDB string remember to remove the <> from the password")
 db = client.iot_platform
 sensor_readings = db['sensor_readings']
 data = db['data']
