@@ -82,7 +82,7 @@ async def home():
 @app.get('/graph')
 async def graph(request: Request):
     size = int(request.query_params.get('size'))
-    readings = await data.find().to_list(size)
+    readings = await data.find().sort('_id', -1).limit(size).to_list(size)
     data_reading = []
     for reading in readings:
         temperature = reading.get("temperature")
