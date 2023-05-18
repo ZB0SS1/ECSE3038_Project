@@ -55,11 +55,6 @@ def get_sunset():
     
     return datetime.datetime.strptime(str(sunset_time),"%H:%M:%S")
 
-current_date = datetime.date.today()
-now_time = datetime.datetime.now(pytz.timezone('Jamaica')).time()
-datetime2 = datetime.datetime.strptime(str(now_time),"%H:%M:%S.%f")
-
-temperature = 28
 
 
 
@@ -84,7 +79,6 @@ async def home():
     return {"message": "ECSE3038 - Project"}
 
 
-
 @app.get('/graph')
 async def graph(request: Request):
     size = int(request.query_params.get('size'))
@@ -95,12 +89,11 @@ async def graph(request: Request):
         presence = reading.get("presence")
         current_time = reading.get("current_time")
 
-        if temperature and presence and current_time:
-            data_reading.append({
-                "temperature": temperature,
-                "presence": presence,
-                "datetime": current_time
-            })
+        data_reading.append({
+            "temperature": temperature,
+            "presence": presence,
+            "datetime": current_time
+        })
 
     return data_reading
 
@@ -111,8 +104,7 @@ async def get_sensor_readings(request: Request):
     user_temp = state["user_temp"]
     user_light = state["user_light"]
     light_time_off = state["light_duration"]
-    global temperature 
-    temperature = int(user_temp)
+    
 
     if user_light == "sunset":
         user_light_scr = get_sunset()
@@ -126,24 +118,44 @@ async def get_sensor_readings(request: Request):
         "user_light": str(user_light_scr.time()),
         "light_time_off": str(new_user_light.time())
         }
-    new_settings = await sensor_readings.insert_one(output)
-    created_settings = await sensor_readings.find_one({"_id":new_settings.inserted_id})
-    return created_settings
+    # new_settings = await sensor_readings.insert_one(output)
+    # created_settings = await sensor_readings.find_one({"_id":new_settings.inserted_id})
+    # return created_settings
 
+    obj = await sensor_readings.find().sort('_id', -1).limit(1).to_list(1)
+
+    if obj:
+        await sensor_readings.update_one({"_id": obj[0]["_id"]}, {"$set": output})
+        new_obj = await sensor_readings.find_one({"_id": obj[0]["_id"]})
+    else:
+        new = await sensor_readings.insert_one(output)
+        new_obj = await sensor_readings.find_one({"_id": new.inserted_id})
+    return new_obj
 
 
 
 @app.put("/temperature")
 async def toggle(request: Request): 
     state = await request.json()
-    global temperature
-    state["light"] = ((datetime2 < get_sunset()+ parse_time("8h")) & (state["presence"] == "1" ))
+
+    param = await sensor_readings.find().sort('_id', -1).limit(1).to_list(1)
+    temperature = param[0]["user_temp"]   
+    user_light = datetime.strptime(param[0]["user_light"], "%H:%M:%S")
+    time_off = datetime.strptime(param[0]["light_time_off"], "%H:%M:%S")
+
+    now_time = datetime.datetime.now(pytz.timezone('Jamaica')).time()
+    current_time = datetime.datetime.strptime(str(now_time),"%H:%M:%S.%f")
+
+
+    state["light"] = ((current_time < user_light) and (current_time < time_off ) & (state["presence"] == "1" ))
     state["fan"] = ((float(state["temperature"]) >= temperature) & (state["presence"]=="1"))
-    state["current_time"]= datetime.datetime.now()
+    state["current_time"]= str(datetime.datetime.now())
 
     new_settings = await data.insert_one(state)
     new_obj = await data.find_one({"_id":new_settings.inserted_id}) 
     return new_obj
+
+
 
 
 #retreves last entry
@@ -160,3 +172,4 @@ async def get_state():
         }
 
     return last_entry
+
