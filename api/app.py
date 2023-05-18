@@ -97,24 +97,23 @@ async def graph(request: Request):
             presence1 = True
         else:
             presence1 = False
-        current_time = reading.get("current_time")
+        upload_time = reading.get("current_time")
 
-        if temperature and presence and current_time:
+        if temperature and presence and upload_time:
             data_reading.append({
                 "temperature": temperature,
                 "presence": presence1,
-                "datetime": current_time
+                "datetime": upload_time
             })
 
     return data_reading
 
 @app.put('/settings')
-async def put_paremeters(request: Request):
+async def put_parameters(request: Request):
     state = await request.json()
     user_temp = state["user_temp"]
     user_light = state["user_light"]
     light_time_off = state["light_duration"]
-
 
     if user_light == "sunset":
         user_light_scr = get_sunset()
@@ -127,26 +126,37 @@ async def put_paremeters(request: Request):
         "user_temp": user_temp,
         "user_light": str(user_light_scr.time()),
         "light_time_off": str(new_user_light.time())
-        }
-    
-    new_settings = await sensor_readings.insert_one(output)
-    created_settings = await sensor_readings.find_one({"_id":new_settings.inserted_id})
-    return created_settings
+    }
+
+    obj = await sensor_readings.find().sort('_id', -1).limit(1).to_list(1)
+
+    if obj:
+        await sensor_readings.update_one({"_id": obj[0]["_id"]}, {"$set": output})
+        new_obj = await sensor_readings.find_one({"_id": obj[0]["_id"]})
+    else:
+        new = await sensor_readings.insert_one(output)
+        new_obj = await sensor_readings.find_one({"_id": new.inserted_id})
+
+    return new_obj
 
 
 
-
-@app.put("/temperature")
+@app.post("/info")
 async def toggle(request: Request):
     state = await request.json()
 
-    temperature = int(state["temperature"])
-    light_time = await sensor_readings.find().sort('_id', -1).limit(1).to_list(1)
+    param = await sensor_readings.find().sort('_id', -1).limit(1).to_list(1)
     
-    current_time = get_current_time
+    temperature = param[0]["user_temp"]
 
-    state["light"] =((light_time["user_light"]  < current_time) and( current_time < light_time["light_time_off"]) and (state["presence"] == "1"))
-    state["fan"] = ((float(state["temperature"]) >= temperature) and (state["presence"] == "1"))
+    current_time = get_current_time()  # Call the function to get the current time
+    user_light = datetime.datetime.strptime(param[0]["user_light"], "%H:%M:%S")
+    light_time_off = datetime.datetime.strptime(param[0]["light_time_off"], "%H:%M:%S")
+
+    state["light"] = (
+        (user_light < current_time < light_time_off and state["presence"] == "1")
+    )
+    state["fan"] = (float(state["temperature"]) >= temperature and state["presence"] == "1")
     state["current_time"] = datetime.datetime.now()
 
     new_settings = await data.insert_one(state)
