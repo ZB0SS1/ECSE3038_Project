@@ -17,6 +17,7 @@ app = FastAPI()
 
 origins = [
     "https://simple-smart-hub-client.netlify.app",
+    "https://ecse3038-project.onrender.com"
     "http://127.0.0.1:8000"
 ]
 
