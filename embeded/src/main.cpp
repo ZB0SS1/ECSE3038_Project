@@ -4,7 +4,7 @@
 #include <ArduinoJson.h>
 #include "env.h" 
 
-#define endpoint "https://ecse3038-project.onrender.com"
+#define endpoint "ecse3038-project.onrender.com"
 
 #define fanPin 22
 #define lightPin 23

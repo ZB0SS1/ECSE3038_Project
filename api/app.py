@@ -88,7 +88,7 @@ async def home():
 @app.get('/graph')
 async def graph(request: Request):
     size = int(request.query_params.get('size'))
-    readings = await data.find().sort('_id', -1).to_list(size)
+    readings = await data.find().sort('_id', -1).limit(size).to_list(size)
 
     data_reading = []
     
@@ -101,12 +101,11 @@ async def graph(request: Request):
             presence1 = False
         upload_time = reading.get("current_time")
 
-        if temperature and presence and upload_time:
-            data_reading.append({
-                "temperature": temperature,
-                "presence": presence1,
-                "datetime": upload_time
-            })
+        data_reading.append({
+            "temperature": temperature,
+            "presence": presence1,
+            "datetime": upload_time
+        })
 
     return data_reading
 
