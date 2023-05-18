@@ -36,34 +36,6 @@ data = db['data']
 
 
 
-# Initialize Nominatim API
-geolocator = Nominatim(user_agent="MyApp")
-
-location = geolocator.geocode("Hyderabad")
-
-
-def get_sunset():
-    user_latitude =  location.latitude
-    user_longitude = location.longitude
-
-    sunset_api_endpoint = f'https://api.sunrise-sunset.org/json?lat={user_latitude}&lng={user_longitude}'
-
-    sunset_api_response = requests.get(sunset_api_endpoint)
-    sunset_api_data = sunset_api_response.json()
-
-    sunset_time = datetime.datetime.strptime(sunset_api_data['results']['sunset'], '%I:%M:%S %p').time()
-    
-    return datetime.datetime.strptime(str(sunset_time),"%H:%M:%S")
-
-current_date = datetime.date.today()
-now_time = datetime.datetime.now(pytz.timezone('Jamaica')).time()
-datetime2 = datetime.datetime.strptime(str(now_time),"%H:%M:%S.%f")
-
-temperature = 28
-
-
-
-
 regex = re.compile(r'((?P<hours>\d+?)h)?((?P<minutes>\d+?)m)?((?P<seconds>\d+?)s)?')
 
 def parse_time(time_str):
@@ -78,6 +50,32 @@ def parse_time(time_str):
     return timedelta(**time_params)
 
 
+# Initialize Nominatim API to get 
+geolocator = Nominatim(user_agent="MyApp")
+location = geolocator.geocode("Hyderabad")
+
+
+def get_sunset():
+    user_latitude =  location.latitude
+    user_longitude = location.longitude
+
+    sunset_api_endpoint = f'https://api.sunrise-sunset.org/json?lat={user_latitude}&lng={user_longitude}&date=today'
+
+    sunset_api_response = requests.get(sunset_api_endpoint)
+    sunset_api_data = sunset_api_response.json()
+
+    sunset_time = datetime.datetime.strptime(sunset_api_data['results']['sunset'], '%I:%M:%S %p').time()
+    
+    utc_to_ja = parse_time("5h")
+
+    return datetime.datetime.strptime(str(sunset_time),"%H:%M:%S") - utc_to_ja 
+
+def get_current_time():
+    jamaica_ptz = pytz.timezone('Jamaica')
+    now_time = datetime.datetime.now(jamaica_ptz).time()
+    return datetime.datetime.strptime(str(now_time),"%H:%M:%S.%f")
+
+
 
 @app.get("/")
 async def home():
@@ -89,36 +87,40 @@ async def home():
 async def graph(request: Request):
     size = int(request.query_params.get('size'))
     readings = await data.find().to_list(size)
+
     data_reading = []
+    
     for reading in readings:
         temperature = reading.get("temperature")
         presence = reading.get("presence")
+        if presence == "1":
+            presence1 = True
+        else:
+            presence1 = False
         current_time = reading.get("current_time")
 
         if temperature and presence and current_time:
             data_reading.append({
                 "temperature": temperature,
-                "presence": presence,
+                "presence": presence1,
                 "datetime": current_time
             })
 
     return data_reading
 
 @app.put('/settings')
-async def get_sensor_readings(request: Request):
+async def put_paremeters(request: Request):
     state = await request.json()
-    #final_sunset_time = str(get_sunset())
     user_temp = state["user_temp"]
     user_light = state["user_light"]
     light_time_off = state["light_duration"]
-    global temperature 
-    temperature = int(user_temp)
+
 
     if user_light == "sunset":
         user_light_scr = get_sunset()
     else:
         user_light_scr = datetime.datetime.strptime(user_light, "%H:%M:%S")
-    
+
     new_user_light = user_light_scr + parse_time(light_time_off)
 
     output = {
@@ -126,6 +128,7 @@ async def get_sensor_readings(request: Request):
         "user_light": str(user_light_scr.time()),
         "light_time_off": str(new_user_light.time())
         }
+    
     new_settings = await sensor_readings.insert_one(output)
     created_settings = await sensor_readings.find_one({"_id":new_settings.inserted_id})
     return created_settings
@@ -134,16 +137,22 @@ async def get_sensor_readings(request: Request):
 
 
 @app.put("/temperature")
-async def toggle(request: Request): 
+async def toggle(request: Request):
     state = await request.json()
-    global temperature
-    state["light"] = ((datetime2 < get_sunset()+ parse_time("8h")) & (state["presence"] == "1" ))
-    state["fan"] = ((float(state["temperature"]) >= temperature) & (state["presence"]=="1"))
-    state["current_time"]= datetime.datetime.now()
+
+    temperature = int(state["temperature"])
+    light_time = await sensor_readings.find().sort('_id', -1).limit(1).to_list(1)
+    
+    current_time = get_current_time
+
+    state["light"] =((light_time["user_light"]  < current_time) and( current_time < light_time["light_time_off"]) and (state["presence"] == "1"))
+    state["fan"] = ((float(state["temperature"]) >= temperature) and (state["presence"] == "1"))
+    state["current_time"] = datetime.datetime.now()
 
     new_settings = await data.insert_one(state)
-    new_obj = await data.find_one({"_id":new_settings.inserted_id}) 
+    new_obj = await data.find_one({"_id": new_settings.inserted_id})
     return new_obj
+
 
 
 #retreves last entry
