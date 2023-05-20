@@ -16,7 +16,7 @@ float getTemp(){
   return random(21.1,33.1);
 }
 
-float getpresence(){
+int getpresence(){
 
   return random(0,1);
 }
@@ -27,6 +27,7 @@ void setup() {
 
 	pinMode(fanPin,OUTPUT);
   pinMode(lightPin,OUTPUT);
+  pinMode(presencePin,OUTPUT);
 
 	// WiFi_SSID and WIFI_PASS should be stored in the env.h
   WiFi.begin(WIFI_SSID, WIFI_PASS);
