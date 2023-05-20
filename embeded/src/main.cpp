@@ -4,7 +4,7 @@
 #include <ArduinoJson.h>
 #include "env.h" 
 
-#define endpoint "rg-lab6-api.onrender.com"
+#define endpoint "ecse3038-project.onrender.com"
 
 #define fanPin 22
 #define lightPin 23
@@ -16,7 +16,7 @@ float getTemp(){
   return random(21.1,33.1);
 }
 
-int getpresence(){
+bool getpresence(){
 
   return random(0,1);
 }
@@ -27,7 +27,6 @@ void setup() {
 
 	pinMode(fanPin,OUTPUT);
   pinMode(lightPin,OUTPUT);
-  pinMode(presencePin,OUTPUT);
 
 	// WiFi_SSID and WIFI_PASS should be stored in the env.h
   WiFi.begin(WIFI_SSID, WIFI_PASS);
@@ -51,7 +50,7 @@ void loop() {
     HTTPClient http;
   
     // Establish a connection to the server
-    String url = "https://" + String(endpoint) + "/temperature";
+    String url = "https://" + String(endpoint) + "/info";
     http.begin(url);
     http.addHeader("Content-type", "application/json");
 
@@ -74,7 +73,7 @@ void loop() {
     serializeJson(docput, httpRequestData);
 
     // Send HTTP PUT request
-    int httpResponseCode = http.PUT(httpRequestData);
+    int httpResponseCode = http.POST(httpRequestData);
     String http_response;
 
     // check reuslt of PUT request. negative response code means server wasn't reached
@@ -126,7 +125,7 @@ void loop() {
     
     bool temp = docget["fan"]; 
     bool light= docget["light"]; 
-    bool presence= docget["presenbce"]; 
+    bool presence= docget["presence"]; 
 
     digitalWrite(fanPin,temp);
     digitalWrite(lightPin,light);
