@@ -149,11 +149,19 @@ async def toggle(request: Request):
 
     param = await settings.find().sort('_id', -1).limit(1).to_list(1)
     
-    temperature = param[0]["user_temp"]
+    if param:
+        temperature = param[0]["user_temp"]
 
+        user_light = datetime.strptime(param[0]["user_light"], "%H:%M:%S")
+        light_time_off = datetime.strptime(param[0]["light_time_off"], "%H:%M:%S")
+
+    else:
+        temperature = 28
+        user_light = datetime.strptime("18:00:00", "%H:%M:%S")
+        light_time_off = datetime.strptime("20:00:00", "%H:%M:%S")
+    
     current_time = get_current_time()  # Call the function to get the current time
-    user_light = datetime.strptime(param[0]["user_light"], "%H:%M:%S")
-    light_time_off = datetime.strptime(param[0]["light_time_off"], "%H:%M:%S")
+
 
     state["light"] = (
         (user_light < current_time < light_time_off and state["presence"] == "1")
