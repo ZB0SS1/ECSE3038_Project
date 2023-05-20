@@ -89,11 +89,11 @@ async def home():
 @app.get('/graph')
 async def graph(request: Request):
     size = int(request.query_params.get('size'))
-    readings = await updates.find().sort('_id', -1).limit(size).to_list(size)
-
+    readings = await updates.find().sort("_id", -1).limit(size).to_list(size)
+    readings_r = sorted(readings, key=lambda x: x["_id"])  # Sort readings in ascending order
     data_reading = []
-    
-    for reading in readings:
+
+    for reading in readings_r:
         temperature = reading.get("temperature")
         presence = reading.get("presence")
         if presence == "1":
@@ -109,6 +109,7 @@ async def graph(request: Request):
         })
 
     return data_reading
+
 
 @app.put('/settings')
 async def put_parameters(request: Request):
@@ -164,9 +165,9 @@ async def toggle(request: Request):
 
 
     state["light"] = (
-        (user_light < current_time < light_time_off and state["presence"] == "1")
+        (user_light < current_time < light_time_off and state["presence"] )
     )
-    state["fan"] = (float(state["temperature"]) >= temperature and state["presence"] == "1")
+    state["fan"] = (float(state["temperature"]) >= temperature and state["presence"] )
     state["current_time"] = datetime.now()
 
     new_settings = await updates.insert_one(state)

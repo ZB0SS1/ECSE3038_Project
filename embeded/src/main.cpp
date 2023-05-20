@@ -16,7 +16,7 @@ float getTemp(){
   return random(21.1,33.1);
 }
 
-float getpresence(){
+bool getpresence(){
 
   return random(0,1);
 }
