@@ -154,8 +154,8 @@ async def toggle(request: Request):
     current_time = datetime.datetime.strptime(str(now_time),"%H:%M:%S.%f")
 
 
-    state["light"] = ((current_time < user_light) and (current_time < time_off ) & (state["presence"] == "1" ))
-    state["fan"] = ((float(state["temperature"]) >= temperature) & (state["presence"]=="1"))
+    state["light"] = ((current_time < user_light) and (current_time < time_off ) & (state["presence"] == 1 ))
+    state["fan"] = ((float(state["temperature"]) >= temperature) & (state["presence"]==1))
     state["current_time"]= str(datetime.datetime.now())
 
     new_settings = await data.insert_one(state)
