@@ -134,7 +134,7 @@ async def get_sensor_readings(request: Request):
 
 
 
-@app.put("/temperature")
+@app.post("/temperature")
 async def toggle(request: Request): 
     state = await request.json()
 
