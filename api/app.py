@@ -139,9 +139,15 @@ async def toggle(request: Request):
     state = await request.json()
 
     param = await sensor_readings.find().sort('_id', -1).limit(1).to_list(1)
-    temperature = param[0]["user_temp"]   
-    user_light = datetime.strptime(param[0]["user_light"], "%H:%M:%S")
-    time_off = datetime.strptime(param[0]["light_time_off"], "%H:%M:%S")
+
+    if param:
+        temperature = param[0]["user_temp"]   
+        user_light = datetime.strptime(param[0]["user_light"], "%H:%M:%S")
+        time_off = datetime.strptime(param[0]["light_time_off"], "%H:%M:%S")
+    else:
+        temperature = 28
+        user_light = datetime.strptime("18:00:00", "%H:%M:%S")
+        time_off = datetime.strptime("20:00:00", "%H:%M:%S")
 
     now_time = datetime.datetime.now(pytz.timezone('Jamaica')).time()
     current_time = datetime.datetime.strptime(str(now_time),"%H:%M:%S.%f")
